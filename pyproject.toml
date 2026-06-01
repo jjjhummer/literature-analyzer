@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "literature-crawler"
+version = "0.1.0"
+description = "文献爬虫与分析系统 - 支持知网/Web of Science/Google Scholar"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Developer"}
+]
+dependencies = [
+    # UI
+    "streamlit>=1.40.0",
+
+    # Browser automation
+    "playwright>=1.48.0",
+    "playwright-stealth>=1.0.6",
+
+    # HTTP & Parsing
+    "httpx>=0.28.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+
+    # Database
+    "sqlalchemy>=2.0.0",
+    "aiosqlite>=0.20.0",
+
+    # Chinese NLP
+    "jieba>=0.42.1",
+    "gensim>=4.3.0",
+    "pyLDAvis>=3.4.0",
+
+    # Data processing
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.4.0",
+
+    # Visualization
+    "plotly>=5.18.0",
+    "matplotlib>=3.8.0",
+    "wordcloud>=1.9.0",
+    "networkx>=3.2.0",
+
+    # Configuration
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+
+    # Export
+    "openpyxl>=3.1.0",
+
+    # Utilities
+    "rich>=13.0.0",
+    "fake-useragent>=1.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.3.0",
+]
+
+[project.scripts]
+lit-crawl = "src.main:cli_main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

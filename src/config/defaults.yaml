@@ -1,0 +1,14 @@
+# 分析配置
+analysis:
+  min_docs_for_topic_modeling: 50
+  max_topics: 15
+  min_topics: 3
+  default_num_topics: 5
+  # 停用词额外列表路径（相对于项目根目录）
+  extra_stopwords_path: ""
+
+# 导出配置
+export:
+  excel_max_rows: 10000
+  chart_format: "png"
+  chart_dpi: 150

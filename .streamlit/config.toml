@@ -1,0 +1,19 @@
+[theme]
+primaryColor = "#1a73e8"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f5f7fa"
+textColor = "#262730"
+font = "sans serif"
+
+[server]
+# Streamlit Cloud 自动设置端口，本地默认8501
+port = 8501
+maxUploadSize = 200
+enableXsrfProtection = true
+enableCORS = false
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "info"

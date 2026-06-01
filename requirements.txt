@@ -1,0 +1,36 @@
+# UI
+streamlit>=1.40.0
+
+# HTTP & Parsing (for import_cnki file parsing)
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# Database
+sqlalchemy>=2.0.0
+
+# Chinese NLP
+jieba>=0.42.1
+gensim>=4.3.0
+
+# Data processing
+pandas>=2.2.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+
+# Visualization
+plotly>=5.18.0
+matplotlib>=3.8.0
+wordcloud>=1.9.0
+networkx>=3.2.0
+
+# Configuration
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+
+# Export
+openpyxl>=3.1.0
+
+# Utilities
+rich>=13.0.0
