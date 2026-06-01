@@ -1,0 +1,2 @@
+# Streamlit Cloud 系统级依赖
+fonts-noto-cjk

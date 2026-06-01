@@ -2,8 +2,13 @@
 
 import io
 import logging
+import os
 from typing import Optional
 from collections import defaultdict
+
+# ⚠️ 必须在 import pyplot 前设置 Agg 后端（Linux headless 环境兼容）
+import matplotlib
+matplotlib.use("Agg")
 
 from sqlalchemy.orm import Session
 from wordcloud import WordCloud
@@ -17,19 +22,27 @@ logger = logging.getLogger(__name__)
 # 尝试加载中文字体
 _FONT_PATH = None
 _CANDIDATE_FONTS = [
-    "C:/Windows/Fonts/simhei.ttf",          # 黑体
-    "C:/Windows/Fonts/msyh.ttc",            # 微软雅黑
-    "C:/Windows/Fonts/simsun.ttc",          # 宋体
-    "C:/Windows/Fonts/STSONG.TTF",          # 华文宋体
-    "/System/Library/Fonts/PingFang.ttc",   # macOS
-    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",  # Linux
+    "C:/Windows/Fonts/simhei.ttf",              # Windows 黑体
+    "C:/Windows/Fonts/msyh.ttc",                # Windows 微软雅黑
+    "C:/Windows/Fonts/simsun.ttc",              # Windows 宋体
+    "C:/Windows/Fonts/STSONG.TTF",              # Windows 华文宋体
+    "/System/Library/Fonts/PingFang.ttc",       # macOS
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Linux Noto CJK
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",   # 文泉驿
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc",
 ]
 
-import os
 for font_path in _CANDIDATE_FONTS:
     if os.path.exists(font_path):
         _FONT_PATH = font_path
+        logger.info(f"✅ 中文字体: {font_path}")
         break
+
+if _FONT_PATH is None:
+    logger.warning("⚠️ 未找到中文字体，词云可能无法正常显示中文")
 
 
 class KeywordCloudAnalyzer(AbstractAnalyzer):

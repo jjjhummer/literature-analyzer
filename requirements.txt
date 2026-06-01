@@ -32,5 +32,8 @@ pyyaml>=6.0
 # Export
 openpyxl>=3.1.0
 
+# Image processing (wordcloud dependency)
+Pillow>=10.0.0
+
 # Utilities
 rich>=13.0.0

@@ -5,6 +5,13 @@ from pathlib import Path
 from datetime import datetime
 from collections import Counter
 
+# ⚠️ 必须在任何 matplotlib 导入前设置后端（Linux headless 兼容）
+import matplotlib
+try:
+    matplotlib.use("Agg")
+except Exception:
+    pass
+
 _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
