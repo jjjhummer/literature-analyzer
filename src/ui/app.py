@@ -137,8 +137,10 @@ if uploaded is not None:
     if uploaded.name == st.session_state._last_upload_name:
         pass
     else:
-        tmp = _project_root / "data" / f"up_{datetime.now().strftime('%H%M%S')}{Path(uploaded.name).suffix}"
-        tmp.parent.mkdir(parents=True, exist_ok=True)
+        import tempfile
+        tmp_dir = Path(tempfile.gettempdir()) / "literature_analyzer"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp = tmp_dir / f"up_{datetime.now().strftime('%H%M%S')}{Path(uploaded.name).suffix}"
         file_bytes = uploaded.read()
         with open(tmp, "wb") as f:
             f.write(file_bytes)
