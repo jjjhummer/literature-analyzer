@@ -127,7 +127,7 @@ def parse_xls(filepath: str) -> list[CnkiRecord]:
     with open(filepath, "r", encoding="utf-8") as f:
         html = f.read()
 
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table")
     if not table:
         logger.error("XLS文件中未找到表格")
