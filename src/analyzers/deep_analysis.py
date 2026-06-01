@@ -362,9 +362,12 @@ class DeepAnalyzer:
     # 6. 摘要聚类 & LDA
     # ═══════════════════════════════════════════════════════
     def abstract_clustering(self, n_clusters: int = 5, max_docs: int = 300) -> dict:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.cluster import KMeans
-        from sklearn.decomposition import PCA
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            from sklearn.cluster import KMeans
+            from sklearn.decomposition import PCA
+        except ImportError:
+            return {"error": "scikit-learn 未安装，无法进行聚类分析。请运行: pip install scikit-learn"}
 
         papers_abs, abstracts = self._get_valid_abstracts()
         if len(abstracts) < 10:
@@ -416,7 +419,10 @@ class DeepAnalyzer:
 
     def lda_topics(self, n_topics: int = 5, max_docs: int = 300) -> dict:
         """LDA主题建模（可视化用）"""
-        from gensim import corpora, models
+        try:
+            from gensim import corpora, models
+        except ImportError:
+            return {"error": "gensim 未安装，无法进行LDA主题建模。请运行: pip install gensim"}
 
         papers_abs, abstracts = self._get_valid_abstracts()
         if len(abstracts) < 20:
