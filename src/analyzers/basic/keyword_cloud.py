@@ -22,42 +22,62 @@ logger = logging.getLogger(__name__)
 # 尝试加载中文字体
 _FONT_PATH = None
 _CANDIDATE_FONTS = [
-    "C:/Windows/Fonts/simhei.ttf",              # Windows 黑体
-    "C:/Windows/Fonts/msyh.ttc",                # Windows 微软雅黑
-    "C:/Windows/Fonts/simsun.ttc",              # Windows 宋体
-    "C:/Windows/Fonts/STSONG.TTF",              # Windows 华文宋体
-    "/System/Library/Fonts/PingFang.ttc",       # macOS
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Linux Noto CJK
+    # Windows
+    "C:/Windows/Fonts/simhei.ttf",
+    "C:/Windows/Fonts/msyh.ttc",
+    "C:/Windows/Fonts/simsun.ttc",
+    "C:/Windows/Fonts/STSONG.TTF",
+    # macOS
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    # Linux - Noto CJK
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",   # 文泉驿
+    # Linux - WenQuanYi (Streamlit Cloud via packages.txt)
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
     "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc",
+    "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+    # Linux - Droid Sans Fallback
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
 ]
 
-for font_path in _CANDIDATE_FONTS:
-    if os.path.exists(font_path):
-        _FONT_PATH = font_path
-        logger.info(f"✅ 中文字体: {font_path}")
-        break
-
-# 最后尝试用 fc-list 查找系统字体
-if _FONT_PATH is None:
-    import subprocess
+def _find_chinese_font():
+    """Locate a usable Chinese font across platforms."""
+    # 1. Try known paths
+    for font_path in _CANDIDATE_FONTS:
+        if os.path.exists(font_path):
+            logger.info(f"✅ 中文字体: {font_path}")
+            return font_path
+    # 2. fc-list (Linux)
     try:
-        result = subprocess.run(["fc-list", ":lang=zh", "file"], capture_output=True, text=True, timeout=5)
+        import subprocess
+        result = subprocess.run(["fc-list", ":lang=zh", "file"],
+                              capture_output=True, text=True, timeout=5)
         for line in result.stdout.strip().split("\n"):
             if ":" in line:
                 path = line.split(":")[0].strip()
                 if os.path.exists(path):
-                    _FONT_PATH = path
-                    logger.info(f"✅ fc-list 中文字体: {_FONT_PATH}")
-                    break
+                    logger.info(f"✅ fc-list 中文字体: {path}")
+                    return path
     except Exception:
         pass
-
-if _FONT_PATH is None:
+    # 3. Glob search common font dirs
+    try:
+        import glob as glob_mod
+        for root in ["/usr/share/fonts", "/usr/local/share/fonts"]:
+            for pat in ["**/*.ttc", "**/*.ttf", "**/*.otf"]:
+                for fpath in glob_mod.glob(os.path.join(root, pat), recursive=True):
+                    if os.path.exists(fpath):
+                        logger.info(f"✅ glob 字体: {fpath}")
+                        return fpath
+    except Exception:
+        pass
     logger.warning("⚠️ 未找到中文字体，词云可能无法正常显示中文")
+    return None
+
+_FONT_PATH = _find_chinese_font()
 
 
 class KeywordCloudAnalyzer(AbstractAnalyzer):

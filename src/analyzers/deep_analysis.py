@@ -418,12 +418,7 @@ class DeepAnalyzer:
         }
 
     def lda_topics(self, n_topics: int = 5, max_docs: int = 300) -> dict:
-        """LDA主题建模（可视化用）"""
-        try:
-            from gensim import corpora, models
-        except ImportError:
-            return {"error": "gensim 未安装，无法进行LDA主题建模。请运行: pip install gensim"}
-
+        """LDA主题建模 — 优先使用 gensim，否则回退到 sklearn"""
         papers_abs, abstracts = self._get_valid_abstracts()
         if len(abstracts) < 20:
             return {"error": "需要至少20篇有摘要的文献"}
@@ -436,14 +431,35 @@ class DeepAnalyzer:
             papers_abs = [papers_abs[i] for i in idx]
             abstracts = [abstracts[i] for i in idx]
 
-        texts = [preprocess_text(a) for a in abstracts]
-        texts = [t for t in texts if len(t) >= 5]
+        texts_raw = [preprocess_text(a) for a in abstracts]
+        texts = [t for t in texts_raw if len(t) >= 5]
+        if len(texts) < 10:
+            return {"error": "预处理后有效文本不足10篇"}
+        k = max(2, min(n_topics, len(texts) // 10))
+
+        # Try gensim first
+        try:
+            from gensim import corpora, models
+            return self._lda_gensim(texts, k, papers_abs, abstracts)
+        except ImportError:
+            pass
+
+        # Fallback to sklearn LatentDirichletAllocation
+        try:
+            from sklearn.feature_extraction.text import CountVectorizer
+            from sklearn.decomposition import LatentDirichletAllocation
+            return self._lda_sklearn(texts, k, papers_abs, abstracts)
+        except ImportError:
+            return {"error": "LDA需要 gensim 或 scikit-learn。请运行: pip install gensim 或 pip install scikit-learn"}
+
+    def _lda_gensim(self, texts, k, papers_abs, abstracts) -> dict:
+        """使用 gensim 进行 LDA"""
+        from gensim import corpora, models
 
         dictionary = corpora.Dictionary(texts)
         dictionary.filter_extremes(no_below=2, no_above=0.8)
         corpus = [dictionary.doc2bow(t) for t in texts]
 
-        k = max(2, min(n_topics, len(texts) // 10))
         lda = models.LdaModel(corpus, id2word=dictionary, num_topics=k,
                               passes=10, random_state=42)
 
@@ -463,6 +479,44 @@ class DeepAnalyzer:
                 topic_year[int(dominant)][year] += 1
 
         return {"topics": topics, "topic_year": {str(k): dict(v) for k, v in topic_year.items()}}
+
+    def _lda_sklearn(self, texts, k, papers_abs, abstracts) -> dict:
+        """使用 sklearn LatentDirichletAllocation 作为回退方案"""
+        from sklearn.feature_extraction.text import CountVectorizer
+        from sklearn.decomposition import LatentDirichletAllocation
+
+        # 构建文档-词频矩阵
+        docs = [" ".join(t) for t in texts]
+        vec = CountVectorizer(max_features=500, max_df=0.8, min_df=2)
+        doc_term = vec.fit_transform(docs)
+        feature_names = vec.get_feature_names_out()
+
+        # 训练 LDA
+        lda = LatentDirichletAllocation(
+            n_components=k, random_state=42, max_iter=10,
+            learning_method="online", batch_size=32,
+        )
+        lda.fit(doc_term)
+
+        # 提取主题-词分布
+        topics = []
+        for i, topic_dist in enumerate(lda.components_):
+            top_idx = topic_dist.argsort()[-10:][::-1]
+            top_terms = [{"word": str(feature_names[j]),
+                          "weight": round(float(topic_dist[j]) / topic_dist.sum(), 3)}
+                         for j in top_idx]
+            topics.append({"id": i, "terms": top_terms})
+
+        # 文档-主题分配
+        doc_topic_dist = lda.transform(doc_term)
+        topic_year = defaultdict(lambda: defaultdict(int))
+        for idx, year in enumerate([p.year for p in papers_abs]):
+            if year and idx < doc_topic_dist.shape[0]:
+                dominant = int(doc_topic_dist[idx].argmax())
+                topic_year[dominant][year] += 1
+
+        return {"topics": topics, "topic_year": {str(k): dict(v) for k, v in topic_year.items()},
+                "engine": "sklearn"}
 
     # ═══════════════════════════════════════════════════════
     # 7. 时间段对比分析

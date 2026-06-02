@@ -355,27 +355,39 @@ if coauthor["edges"]:
         G.add_node(n["id"])
     for e in coauthor["edges"][:network_max_edges]:
         G.add_edge(e["source"], e["target"], weight=e["weight"])
-    pos = nx.spring_layout(G, k=1.5, iterations=50, seed=42)
-    edge_x, edge_y = [], []
-    for u, v in G.edges():
-        x0, y0 = pos[u]; x1, y1 = pos[v]
-        edge_x.extend([x0, x1, None]); edge_y.extend([y0, y1, None])
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines",
-                             line=dict(width=0.4, color="#ccc"), hoverinfo="none"))
-    deg = dict(G.degree())
-    fig.add_trace(go.Scatter(
-        x=[pos[n][0] for n in G.nodes()], y=[pos[n][1] for n in G.nodes()],
-        mode="markers+text", text=[n for n in G.nodes()],
-        textposition="top center", textfont=dict(size=10),
-        marker=dict(size=[max(8, deg.get(n, 1) * 4) for n in G.nodes()],
-                    color=list(deg.values()), colorscale="Viridis",
-                    showscale=True, colorbar=dict(title="合作次数")),
-    ))
-    fig.update_layout(title="作者合作网络", height=700, showlegend=False,
-                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-    st.plotly_chart(fig, use_container_width=True)
+    # Remove isolated nodes
+    G.remove_nodes_from(list(nx.isolates(G)))
+    if G.number_of_nodes() > 0:
+        n_nodes = G.number_of_nodes()
+        pos = nx.spring_layout(G, k=max(2.0, 8.0 / max(1, n_nodes**0.5)),
+                               iterations=100, seed=42)
+        edge_x, edge_y = [], []
+        for u, v in G.edges():
+            x0, y0 = pos[u]; x1, y1 = pos[v]
+            edge_x.extend([x0, x1, None]); edge_y.extend([y0, y1, None])
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines",
+                                 line=dict(width=0.3, color="#aaa"), hoverinfo="none"))
+        deg = dict(G.degree())
+        fig.add_trace(go.Scatter(
+            x=[pos[n][0] for n in G.nodes()],
+            y=[pos[n][1] for n in G.nodes()],
+            mode="markers+text",
+            text=[(n[:8] + "…" if len(n) > 9 else n) for n in G.nodes()],
+            textposition="top center",
+            textfont=dict(size=max(8, min(12, 400 // max(1, n_nodes)))),
+            hovertext=[f"{n}<br>合作次数: {deg.get(n, 0)}" for n in G.nodes()],
+            hoverinfo="text",
+            marker=dict(size=[max(6, deg.get(n, 1) * 3) for n in G.nodes()],
+                        color=list(deg.values()), colorscale="Viridis",
+                        showscale=True, colorbar=dict(title="合作次数")),
+        ))
+        fig.update_layout(title=f"作者合作网络 ({n_nodes}位作者)",
+                          height=650, showlegend=False,
+                          margin=dict(l=10, r=10, t=40, b=10),
+                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                          yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+        st.plotly_chart(fig, use_container_width=True)
 
 # ═══════════════════ 4. 机构分析 ═══════════════════
 st.markdown("---")
@@ -418,24 +430,35 @@ if icollab["edges"]:
         G2.add_node(n["id"])
     for e in icollab["edges"][:network_max_edges]:
         G2.add_edge(e["source"], e["target"], weight=e["weight"])
-    pos2 = nx.spring_layout(G2, k=1.5, iterations=50, seed=42)
-    ex, ey = [], []
-    for u, v in G2.edges():
-        x0, y0 = pos2[u]; x1, y1 = pos2[v]
-        ex.extend([x0, x1, None]); ey.extend([y0, y1, None])
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ex, y=ey, mode="lines",
-                             line=dict(width=0.5, color="#bbb"), hoverinfo="none"))
-    fig.add_trace(go.Scatter(
-        x=[pos2[n][0] for n in G2.nodes()], y=[pos2[n][1] for n in G2.nodes()],
-        mode="markers+text", text=[n for n in G2.nodes()],
-        textposition="top center", textfont=dict(size=10),
-        marker=dict(size=12, color="steelblue"),
-    ))
-    fig.update_layout(title="机构合作网络", height=450, showlegend=False,
-                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-    st.plotly_chart(fig, use_container_width=True)
+    G2.remove_nodes_from(list(nx.isolates(G2)))
+    if G2.number_of_nodes() > 0:
+        n_nodes2 = G2.number_of_nodes()
+        pos2 = nx.spring_layout(G2, k=max(2.0, 10.0 / max(1, n_nodes2**0.5)),
+                                iterations=100, seed=42)
+        ex, ey = [], []
+        for u, v in G2.edges():
+            x0, y0 = pos2[u]; x1, y1 = pos2[v]
+            ex.extend([x0, x1, None]); ey.extend([y0, y1, None])
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=ex, y=ey, mode="lines",
+                                 line=dict(width=0.4, color="#bbb"), hoverinfo="none"))
+        fig.add_trace(go.Scatter(
+            x=[pos2[n][0] for n in G2.nodes()],
+            y=[pos2[n][1] for n in G2.nodes()],
+            mode="markers+text",
+            text=[(n[:10] + "…" if len(n) > 11 else n) for n in G2.nodes()],
+            textposition="top center",
+            textfont=dict(size=max(8, min(12, 400 // max(1, n_nodes2)))),
+            hovertext=list(G2.nodes()),
+            hoverinfo="text",
+            marker=dict(size=12, color="steelblue"),
+        ))
+        fig.update_layout(title=f"机构合作网络 ({n_nodes2}个机构)",
+                          height=500, showlegend=False,
+                          margin=dict(l=10, r=10, t=40, b=10),
+                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                          yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+        st.plotly_chart(fig, use_container_width=True)
 
 # ═══════════════════ 5. 深度分析 ═══════════════════
 st.markdown("---")
@@ -480,7 +503,7 @@ if "error" not in lda and lda.get("topics"):
             st.markdown(f"""<div class="card" style="text-align:center;">
             <b>主题 {t['id']+1}</b><br><small>{terms}</small></div>""", unsafe_allow_html=True)
 else:
-    st.info("LDA 需要更多摘要数据（≥20篇有摘要的文献）或先安装: pip install gensim")
+    st.info("LDA 需要更多摘要数据（≥20篇有摘要的文献），或安装 gensim 以获得更高质量的主题建模")
 
 # 硕博对比 + 基金
 st.markdown("---")
