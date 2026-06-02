@@ -311,7 +311,7 @@ with wc2:
 st.markdown("---")
 st.markdown('<div class="section-title">👤 作者分析</div>', unsafe_allow_html=True)
 
-ar1, ar2 = st.columns([1, 2])
+ar1, ar2 = st.columns(2)
 with ar1:
     author_rank = analyzer.author_ranking(top_n=15)
     if author_rank:
@@ -321,42 +321,44 @@ with ar1:
         fig.update_layout(yaxis=dict(autorange="reversed"), height=380)
         st.plotly_chart(fig, use_container_width=True)
 
+with ar2:
     prod = analyzer.author_productivity_distribution()
     if prod.get("labels"):
         pdf = pd.DataFrame({"发文量": prod["labels"], "作者数": prod["counts"]})
         fig = px.bar(pdf, x="发文量", y="作者数", title="作者生产力分布")
-        fig.update_layout(height=220)
+        fig.update_layout(height=380)
         st.plotly_chart(fig, use_container_width=True)
 
-with ar2:
-    coauthor = analyzer.author_co_occurrence(min_papers=1)
-    if coauthor["edges"]:
-        G = nx.Graph()
-        for n in coauthor["nodes"]:
-            G.add_node(n["id"])
-        for e in coauthor["edges"][:60]:
-            G.add_edge(e["source"], e["target"], weight=e["weight"])
-        pos = nx.spring_layout(G, k=1.0, iterations=50, seed=42)
-        edge_x, edge_y = [], []
-        for u, v in G.edges():
-            x0, y0 = pos[u]; x1, y1 = pos[v]
-            edge_x.extend([x0, x1, None]); edge_y.extend([y0, y1, None])
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines",
-                                 line=dict(width=0.4, color="#ccc"), hoverinfo="none"))
-        deg = dict(G.degree())
-        fig.add_trace(go.Scatter(
-            x=[pos[n][0] for n in G.nodes()], y=[pos[n][1] for n in G.nodes()],
-            mode="markers+text", text=[n for n in G.nodes()],
-            textposition="top center", textfont=dict(size=9),
-            marker=dict(size=[max(6, deg.get(n, 1) * 3) for n in G.nodes()],
-                        color=list(deg.values()), colorscale="Viridis",
-                        showscale=True, colorbar=dict(title="度")),
-        ))
-        fig.update_layout(title="作者合作网络", height=550, showlegend=False,
-                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                          yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-        st.plotly_chart(fig, use_container_width=True)
+# 作者合作网络 - 独占一行，全宽展示
+coauthor = analyzer.author_co_occurrence(min_papers=1)
+if coauthor["edges"]:
+    st.markdown("#### 🤝 作者合作网络")
+    G = nx.Graph()
+    for n in coauthor["nodes"]:
+        G.add_node(n["id"])
+    for e in coauthor["edges"][:60]:
+        G.add_edge(e["source"], e["target"], weight=e["weight"])
+    pos = nx.spring_layout(G, k=1.5, iterations=50, seed=42)
+    edge_x, edge_y = [], []
+    for u, v in G.edges():
+        x0, y0 = pos[u]; x1, y1 = pos[v]
+        edge_x.extend([x0, x1, None]); edge_y.extend([y0, y1, None])
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines",
+                             line=dict(width=0.4, color="#ccc"), hoverinfo="none"))
+    deg = dict(G.degree())
+    fig.add_trace(go.Scatter(
+        x=[pos[n][0] for n in G.nodes()], y=[pos[n][1] for n in G.nodes()],
+        mode="markers+text", text=[n for n in G.nodes()],
+        textposition="top center", textfont=dict(size=10),
+        marker=dict(size=[max(8, deg.get(n, 1) * 4) for n in G.nodes()],
+                    color=list(deg.values()), colorscale="Viridis",
+                    showscale=True, colorbar=dict(title="度")),
+    ))
+    fig.update_layout(title="作者合作网络", height=700, showlegend=False,
+                      xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                      yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+    st.plotly_chart(fig, use_container_width=True)
 
 # ═══════════════════ 4. 机构分析 ═══════════════════
 st.markdown("---")
