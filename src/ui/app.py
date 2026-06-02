@@ -1,11 +1,10 @@
-"""文献分析系统 - 单页滚动版 (v6.0 深度分析增强)"""
+"""文献分析系统 - 单页滚动版 (v6.1 内联参数控制)"""
 
 import sys, io, base64, os, asyncio, importlib
 from pathlib import Path
 from datetime import datetime
 from collections import Counter
 
-# ⚠️ 必须在任何 matplotlib 导入前设置后端（Linux headless 兼容）
 import matplotlib
 try:
     matplotlib.use("Agg")
@@ -53,7 +52,7 @@ st.markdown("""<style>
 .metric .n{font-size:2em;font-weight:bold;color:#1a73e8;}
 .metric .l{font-size:0.75em;color:#666;}
 .section-title{font-size:1.3em;font-weight:bold;margin-top:20px;padding:10px 0;border-bottom:2px solid #1a73e8;}
-.sidebar-note{font-size:0.8em;color:#888;margin-top:10px;}
+.control-row{border:1px solid #e0e4e8;border-radius:8px;padding:10px 15px;margin:8px 0;background:#fafbfc;}
 </style>""", unsafe_allow_html=True)
 
 # ── Session State ──
@@ -162,7 +161,6 @@ if uploaded is not None:
         except Exception as e:
             st.error(f"解析失败: {e}")
 
-# 刷新 total
 try:
     s = get_session()
     total = PaperRepository(s).count_all()
@@ -181,44 +179,11 @@ if total == 0:
     """)
     st.stop()
 
-# ═══════════════════ 加载分析器 ═══════════════════
 try:
     analyzer = get_analyzer()
 except Exception as e:
     st.error(f"初始化分析失败: {e}")
     st.stop()
-
-# ═══════════════════ 侧边栏：参数控制 ═══════════════════
-with st.sidebar:
-    st.markdown("## ⚙️ 分析参数")
-    st.markdown('<p class="sidebar-note">调整以下参数后图表会实时更新</p>', unsafe_allow_html=True)
-    st.markdown("---")
-
-    st.markdown("### 📊 通用设置")
-    top_n_authors = st.slider("作者排名数量", 5, 50, 15, 5, key="s_author_n")
-    top_n_insts = st.slider("机构排名数量", 5, 50, 15, 5, key="s_inst_n")
-    top_n_keywords = st.slider("关键词展示数量", 10, 100, 30, 10, key="s_kw_n")
-
-    st.markdown("---")
-    st.markdown("### ☁ 词云设置")
-    wc_max_words = st.slider("词云最大词数", 50, 500, 150, 50, key="s_wc_words")
-    wc_bg = st.selectbox("词云背景色", ["white", "black", "#f5f7fa"], key="s_wc_bg")
-
-    st.markdown("---")
-    st.markdown("### 🧠 深度分析")
-    cluster_n = st.slider("聚类数量", 2, 10, 5, 1, key="s_cluster_n")
-    lda_n = st.slider("LDA主题数", 2, 10, 5, 1, key="s_lda_n")
-
-    st.markdown("---")
-    st.markdown("### 🔗 网络图设置")
-    coauthor_min = st.slider("合作网络-最少合作次数", 1, 10, 1, 1, key="s_coauthor_min")
-    collab_min = st.slider("机构合作-最少合作次数", 1, 10, 1, 1, key="s_collab_min")
-    network_max_edges = st.slider("网络图最大边数", 20, 200, 60, 20, key="s_net_edges")
-
-    st.markdown("---")
-    st.caption(f"📦 数据库共 {total} 篇文献")
-
-# ═══════════════════ 主内容 ═══════════════════
 
 stats = analyzer.summary_stats()
 gr = analyzer.yearly_growth()
@@ -307,9 +272,12 @@ if burst.get("bursts"):
 st.markdown("---")
 st.markdown('<div class="section-title">🔗 关键词分析</div>', unsafe_allow_html=True)
 
+# ── 参数控件 ──
+kw_n = st.slider("关键词展示数量", 10, 100, 30, 10, key="kw_n")
+
 kr1, kr2 = st.columns([3, 2])
 with kr1:
-    corr = analyzer.keyword_correlation(top_n=min(top_n_keywords, 30))
+    corr = analyzer.keyword_correlation(top_n=min(kw_n, 30))
     if corr.get("matrix"):
         cdf = pd.DataFrame(corr["matrix"], index=corr["keywords"], columns=corr["keywords"])
         fig = px.imshow(cdf, aspect="auto", color_continuous_scale="RdBu_r",
@@ -318,7 +286,7 @@ with kr1:
         st.plotly_chart(fig, use_container_width=True)
 
 with kr2:
-    treemap = analyzer.keyword_treemap(top_n=top_n_keywords)
+    treemap = analyzer.keyword_treemap(top_n=kw_n)
     if treemap:
         tdf = pd.DataFrame(treemap)
         fig = px.treemap(tdf, path=["keyword"], values="count",
@@ -326,7 +294,13 @@ with kr2:
         fig.update_layout(height=450)
         st.plotly_chart(fig, use_container_width=True)
 
-# 词云 + 演变热力图
+# ── 词云参数 ──
+wc_col1, wc_col2, wc_col3 = st.columns(3)
+with wc_col1:
+    wc_max_words = st.slider("词云最大词数", 50, 500, 150, 50, key="wc_words")
+with wc_col2:
+    wc_bg = st.selectbox("词云背景色", ["white", "black", "#f5f7fa"], key="wc_bg")
+
 wc1, wc2 = st.columns([1, 2])
 with wc1:
     try:
@@ -355,6 +329,15 @@ with wc2:
 # ═══════════════════ 3. 作者分析 ═══════════════════
 st.markdown("---")
 st.markdown('<div class="section-title">👤 作者分析</div>', unsafe_allow_html=True)
+
+# ── 参数控件 ──
+au_col1, au_col2, au_col3 = st.columns(3)
+with au_col1:
+    top_n_authors = st.slider("作者排名数量", 5, 50, 15, 5, key="au_n")
+with au_col2:
+    coauthor_min = st.slider("合作网络-最少合作次数", 1, 10, 1, 1, key="coauthor_min")
+with au_col3:
+    network_max_edges = st.slider("网络图最大边数", 20, 200, 60, 20, key="net_edges")
 
 ar1, ar2 = st.columns(2)
 with ar1:
@@ -408,6 +391,13 @@ if coauthor["edges"]:
 # ═══════════════════ 4. 机构分析 ═══════════════════
 st.markdown("---")
 st.markdown('<div class="section-title">🏛 机构分析</div>', unsafe_allow_html=True)
+
+# ── 参数控件 ──
+inst_col1, inst_col2 = st.columns(2)
+with inst_col1:
+    top_n_insts = st.slider("机构排名数量", 5, 50, 15, 5, key="inst_n")
+with inst_col2:
+    collab_min = st.slider("机构合作-最少合作次数", 1, 10, 1, 1, key="collab_min")
 
 ir1, ir2 = st.columns(2)
 with ir1:
@@ -465,6 +455,13 @@ if icollab["edges"]:
 st.markdown("---")
 st.markdown('<div class="section-title">🧠 深度分析</div>', unsafe_allow_html=True)
 
+# ── 参数控件 ──
+deep_col1, deep_col2 = st.columns(2)
+with deep_col1:
+    cluster_n = st.slider("聚类数量", 2, 10, 5, 1, key="cluster_n")
+with deep_col2:
+    lda_n = st.slider("LDA主题数", 2, 10, 5, 1, key="lda_n")
+
 # 聚类
 st.markdown("#### 📌 文献聚类")
 cl1, cl2 = st.columns([3, 2])
@@ -501,7 +498,7 @@ if "error" not in lda and lda.get("topics"):
             st.markdown(f"""<div class="card" style="text-align:center;">
             <b>主题 {t['id']+1}</b><br><small>{terms}</small></div>""", unsafe_allow_html=True)
 else:
-    st.info("LDA 需要更多摘要数据（≥20篇有摘要的文献）")
+    st.info("LDA 需要更多摘要数据（≥20篇有摘要的文献）或先安装: pip install gensim")
 
 # 硕博对比 + 基金
 st.markdown("---")
@@ -615,7 +612,7 @@ with ec2:
         st.download_button("📥 导出 CSV", data=csv, file_name="文献导出.csv",
                            mime="text/csv", use_container_width=True)
 with ec3:
-    st.caption(f"v6.0 | {total}篇 | 深度分析版")
+    st.caption(f"v6.1 | {total}篇 | 深度分析版")
 
 st.markdown("---")
 st.caption("文献分析系统 — 上传知网导出文件 → 自动解析 → 全方位可视化分析")
