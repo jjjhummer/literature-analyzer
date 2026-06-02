@@ -1,4 +1,4 @@
-"""文献分析系统 - 单页滚动版 (v6.1 内联参数控制)"""
+"""文献分析系统 - 单页滚动版 (v6.2 单图全宽布局)"""
 
 import sys, io, base64, os, asyncio, importlib
 from pathlib import Path
@@ -210,27 +210,24 @@ for col, (label, val) in zip(kpi_cols, kpis):
 st.markdown("---")
 st.markdown('<div class="section-title">📈 发文趋势与增长</div>', unsafe_allow_html=True)
 
-c1, c2 = st.columns([2, 1])
-with c1:
-    yearly = analyzer.repo.get_yearly_counts()
-    if yearly:
-        df = pd.DataFrame({"年份": sorted(yearly.keys()),
-                           "发文量": [yearly[y] for y in sorted(yearly.keys())]})
-        fig = px.bar(df, x="年份", y="发文量")
-        fig.add_trace(go.Scatter(x=df["年份"], y=df["发文量"], mode="lines+markers",
-                                 line=dict(width=3, color="#e74c3c"), name="趋势"))
-        fig.update_layout(height=380)
-        st.plotly_chart(fig, use_container_width=True)
+yearly = analyzer.repo.get_yearly_counts()
+if yearly:
+    df = pd.DataFrame({"年份": sorted(yearly.keys()),
+                       "发文量": [yearly[y] for y in sorted(yearly.keys())]})
+    fig = px.bar(df, x="年份", y="发文量")
+    fig.add_trace(go.Scatter(x=df["年份"], y=df["发文量"], mode="lines+markers",
+                             line=dict(width=3, color="#e74c3c"), name="趋势"))
+    fig.update_layout(height=450)
+    st.plotly_chart(fig, use_container_width=True)
 
-with c2:
-    if gr.get("growth_data"):
-        gdf = pd.DataFrame(gr["growth_data"])
-        fig = px.bar(gdf, x="年份", y="增长率%", color="增长率%",
-                     color_continuous_scale=["green", "yellow", "red"],
-                     color_continuous_midpoint=0,
-                     title=f"年增长率 (CAGR: {gr['cagr']}%)")
-        fig.update_layout(height=380)
-        st.plotly_chart(fig, use_container_width=True)
+if gr.get("growth_data"):
+    gdf = pd.DataFrame(gr["growth_data"])
+    fig = px.bar(gdf, x="年份", y="增长率%", color="增长率%",
+                 color_continuous_scale=["green", "yellow", "red"],
+                 color_continuous_midpoint=0,
+                 title=f"年增长率 (CAGR: {gr['cagr']}%)")
+    fig.update_layout(height=400)
+    st.plotly_chart(fig, use_container_width=True)
 
 # 时间段对比 + 机构年度趋势
 tab1, tab2 = st.tabs(["📊 时间段对比", "🏛 机构年度趋势"])
@@ -275,24 +272,21 @@ st.markdown('<div class="section-title">🔗 关键词分析</div>', unsafe_allo
 # ── 参数控件 ──
 kw_n = st.slider("关键词展示数量", 10, 100, 30, 10, key="kw_n")
 
-kr1, kr2 = st.columns([3, 2])
-with kr1:
-    corr = analyzer.keyword_correlation(top_n=min(kw_n, 30))
-    if corr.get("matrix"):
-        cdf = pd.DataFrame(corr["matrix"], index=corr["keywords"], columns=corr["keywords"])
-        fig = px.imshow(cdf, aspect="auto", color_continuous_scale="RdBu_r",
-                        title="关键词相关性热力图 (Jaccard)", zmin=0, zmax=1)
-        fig.update_layout(height=450)
-        st.plotly_chart(fig, use_container_width=True)
+corr = analyzer.keyword_correlation(top_n=min(kw_n, 30))
+if corr.get("matrix"):
+    cdf = pd.DataFrame(corr["matrix"], index=corr["keywords"], columns=corr["keywords"])
+    fig = px.imshow(cdf, aspect="auto", color_continuous_scale="RdBu_r",
+                    title="关键词相关性热力图 (Jaccard)", zmin=0, zmax=1)
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
 
-with kr2:
-    treemap = analyzer.keyword_treemap(top_n=kw_n)
-    if treemap:
-        tdf = pd.DataFrame(treemap)
-        fig = px.treemap(tdf, path=["keyword"], values="count",
-                         title="关键词分布树图", color="count", color_continuous_scale="Blues")
-        fig.update_layout(height=450)
-        st.plotly_chart(fig, use_container_width=True)
+treemap = analyzer.keyword_treemap(top_n=kw_n)
+if treemap:
+    tdf = pd.DataFrame(treemap)
+    fig = px.treemap(tdf, path=["keyword"], values="count",
+                     title="关键词分布树图", color="count", color_continuous_scale="Blues")
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
 
 # ── 词云参数 ──
 wc_col1, wc_col2, wc_col3 = st.columns(3)
@@ -301,30 +295,28 @@ with wc_col1:
 with wc_col2:
     wc_bg = st.selectbox("词云背景色", ["white", "black", "#f5f7fa"], key="wc_bg")
 
-wc1, wc2 = st.columns([1, 2])
-with wc1:
-    try:
-        session = get_session()
-        kw_analyzer = KeywordCloudAnalyzer()
-        result = kw_analyzer.analyze(session, max_words=wc_max_words, background_color=wc_bg)
-        session.close()
-        if result.data.get("image_base64"):
-            st.markdown(f'<img src="data:image/png;base64,{result.data["image_base64"]}" '
-                        f'style="max-width:100%;border-radius:8px;">', unsafe_allow_html=True)
-        elif result.warnings:
-            for w in result.warnings:
-                st.warning(w)
-    except Exception as e:
-        st.warning(f"词云生成失败: {e}")
+st.markdown("#### ☁️ 词云")
+try:
+    session = get_session()
+    kw_analyzer = KeywordCloudAnalyzer()
+    result = kw_analyzer.analyze(session, max_words=wc_max_words, background_color=wc_bg)
+    session.close()
+    if result.data.get("image_base64"):
+        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{result.data["image_base64"]}" '
+                    f'style="max-width:900px;width:100%;border-radius:8px;"></div>', unsafe_allow_html=True)
+    elif result.warnings:
+        for w in result.warnings:
+            st.warning(w)
+except Exception as e:
+    st.warning(f"词云生成失败: {e}")
 
-with wc2:
-    evo = analyzer.keyword_year_evolution(top_n=8)
-    if evo and evo.get("data"):
-        evo_df = pd.DataFrame(evo["data"]).set_index("年份")
-        fig = px.imshow(evo_df.T, aspect="auto", color_continuous_scale="YlOrRd",
-                        title="关键词×年份 演变热力图")
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+evo = analyzer.keyword_year_evolution(top_n=8)
+if evo and evo.get("data"):
+    evo_df = pd.DataFrame(evo["data"]).set_index("年份")
+    fig = px.imshow(evo_df.T, aspect="auto", color_continuous_scale="YlOrRd",
+                    title="关键词×年份 演变热力图")
+    fig.update_layout(height=480)
+    st.plotly_chart(fig, use_container_width=True)
 
 # ═══════════════════ 3. 作者分析 ═══════════════════
 st.markdown("---")
@@ -339,23 +331,20 @@ with au_col2:
 with au_col3:
     network_max_edges = st.slider("网络图最大边数", 20, 200, 60, 20, key="net_edges")
 
-ar1, ar2 = st.columns(2)
-with ar1:
-    author_rank = analyzer.author_ranking(top_n=top_n_authors)
-    if author_rank:
-        adf = pd.DataFrame([{"作者": a["name"], "发文量": a["count"]} for a in author_rank])
-        fig = px.bar(adf, x="发文量", y="作者", orientation="h", color="发文量",
-                     color_continuous_scale="Blues", title="作者发文排名")
-        fig.update_layout(yaxis=dict(autorange="reversed"), height=380)
-        st.plotly_chart(fig, use_container_width=True)
+author_rank = analyzer.author_ranking(top_n=top_n_authors)
+if author_rank:
+    adf = pd.DataFrame([{"作者": a["name"], "发文量": a["count"]} for a in author_rank])
+    fig = px.bar(adf, x="发文量", y="作者", orientation="h", color="发文量",
+                 color_continuous_scale="Blues", title="作者发文排名")
+    fig.update_layout(yaxis=dict(autorange="reversed"), height=450)
+    st.plotly_chart(fig, use_container_width=True)
 
-with ar2:
-    prod = analyzer.author_productivity_distribution()
-    if prod.get("labels"):
-        pdf = pd.DataFrame({"发文量": prod["labels"], "作者数": prod["counts"]})
-        fig = px.bar(pdf, x="发文量", y="作者数", title="作者生产力分布")
-        fig.update_layout(height=380)
-        st.plotly_chart(fig, use_container_width=True)
+prod = analyzer.author_productivity_distribution()
+if prod.get("labels"):
+    pdf = pd.DataFrame({"发文量": prod["labels"], "作者数": prod["counts"]})
+    fig = px.bar(pdf, x="发文量", y="作者数", title="作者生产力分布")
+    fig.update_layout(height=400)
+    st.plotly_chart(fig, use_container_width=True)
 
 # 作者合作网络 - 独占一行
 coauthor = analyzer.author_co_occurrence(min_papers=coauthor_min)
@@ -399,29 +388,26 @@ with inst_col1:
 with inst_col2:
     collab_min = st.slider("机构合作-最少合作次数", 1, 10, 1, 1, key="collab_min")
 
-ir1, ir2 = st.columns(2)
-with ir1:
-    inst_rank = analyzer.institution_ranking(top_n=top_n_insts)
-    if inst_rank:
-        idf = pd.DataFrame([{"机构": r["name"], "发文量": r["count"]} for r in inst_rank])
-        fig = px.bar(idf, x="发文量", y="机构", orientation="h", color="发文量",
-                     color_continuous_scale="Greens", title="机构发文排名")
-        fig.update_layout(yaxis=dict(autorange="reversed"), height=400)
-        st.plotly_chart(fig, use_container_width=True)
+inst_rank = analyzer.institution_ranking(top_n=top_n_insts)
+if inst_rank:
+    idf = pd.DataFrame([{"机构": r["name"], "发文量": r["count"]} for r in inst_rank])
+    fig = px.bar(idf, x="发文量", y="机构", orientation="h", color="发文量",
+                 color_continuous_scale="Greens", title="机构发文排名")
+    fig.update_layout(yaxis=dict(autorange="reversed"), height=450)
+    st.plotly_chart(fig, use_container_width=True)
 
-with ir2:
-    profile = analyzer.institution_keyword_profile(top_insts=4, top_kws=8)
-    if profile.get("institutions"):
-        fig = go.Figure()
-        for inst in profile["institutions"]:
-            fig.add_trace(go.Scatterpolar(
-                r=[profile["profiles"][inst].get(kw, 0) for kw in profile["keywords"]],
-                theta=profile["keywords"], fill="toself", name=inst[:15],
-            ))
-        max_v = max(max(profile["profiles"][inst].values()) for inst in profile["institutions"])
-        fig.update_layout(title="机构关键词画像", height=400,
-                          polar=dict(radialaxis=dict(visible=True, range=[0, max_v * 1.2])))
-        st.plotly_chart(fig, use_container_width=True)
+profile = analyzer.institution_keyword_profile(top_insts=4, top_kws=8)
+if profile.get("institutions"):
+    fig = go.Figure()
+    for inst in profile["institutions"]:
+        fig.add_trace(go.Scatterpolar(
+            r=[profile["profiles"][inst].get(kw, 0) for kw in profile["keywords"]],
+            theta=profile["keywords"], fill="toself", name=inst[:15],
+        ))
+    max_v = max(max(profile["profiles"][inst].values()) for inst in profile["institutions"])
+    fig.update_layout(title="机构关键词画像雷达图", height=450,
+                      polar=dict(radialaxis=dict(visible=True, range=[0, max_v * 1.2])))
+    st.plotly_chart(fig, use_container_width=True)
 
 # 机构合作网络
 icollab = analyzer.institution_collaboration(min_weight=collab_min)
@@ -464,27 +450,23 @@ with deep_col2:
 
 # 聚类
 st.markdown("#### 📌 文献聚类")
-cl1, cl2 = st.columns([3, 2])
-with cl1:
-    with st.spinner("正在进行文献聚类..."):
-        clustering = analyzer.abstract_clustering(n_clusters=cluster_n)
-    if "error" not in clustering:
-        pdf = pd.DataFrame(clustering["points"])
-        fig = px.scatter(pdf, x="x", y="y", color=pdf["cluster"].astype(str),
-                         hover_data=["title", "year"],
-                         title=f"文献聚类 ({clustering['n_clusters']}类, PCA方差:{clustering['explained_variance']:.1%})",
-                         color_discrete_sequence=px.colors.qualitative.Set2)
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info(clustering.get("error", "聚类数据不足"))
-
-with cl2:
-    if "error" not in clustering:
-        for cl in clustering["clusters"]:
-            with st.expander(f"📌 聚类{cl['id']+1}: {', '.join(cl['keywords'][:4])} ({cl['count']}篇)"):
-                for p in cl["papers"]:
-                    st.markdown(f"- {p['title'][:50]} ({p['year']})")
+with st.spinner("正在进行文献聚类..."):
+    clustering = analyzer.abstract_clustering(n_clusters=cluster_n)
+if "error" not in clustering:
+    pdf = pd.DataFrame(clustering["points"])
+    fig = px.scatter(pdf, x="x", y="y", color=pdf["cluster"].astype(str),
+                     hover_data=["title", "year"],
+                     title=f"文献聚类 ({clustering['n_clusters']}类, PCA方差:{clustering['explained_variance']:.1%})",
+                     color_discrete_sequence=px.colors.qualitative.Set2)
+    fig.update_layout(height=500)
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown("##### 各类详情")
+    for cl in clustering["clusters"]:
+        with st.expander(f"📌 聚类{cl['id']+1}: {', '.join(cl['keywords'][:4])} ({cl['count']}篇)"):
+            for p in cl["papers"]:
+                st.markdown(f"- {p['title'][:50]} ({p['year']})")
+else:
+    st.info(clustering.get("error", "聚类数据不足"))
 
 # LDA
 st.markdown("#### 🧩 LDA主题建模")
@@ -502,54 +484,50 @@ else:
 
 # 硕博对比 + 基金
 st.markdown("---")
-dd1, dd2 = st.columns(2)
+st.markdown("#### 🎓 硕博论文对比")
+deg = analyzer.degree_analysis()
+if deg["doctor"]["count"] > 0 and deg["master"]["count"] > 0:
+    st.caption(f"博士论文 ({deg['doctor']['count']}篇)")
+    dd = pd.DataFrame(deg["doctor"]["keywords"], columns=["关键词", "频次"])
+    fig = px.bar(dd.head(8), x="频次", y="关键词", orientation="h",
+                 color="频次", color_continuous_scale="Reds", title="博士高频词")
+    fig.update_layout(yaxis=dict(autorange="reversed"), height=350)
+    st.plotly_chart(fig, use_container_width=True)
 
-with dd1:
-    st.markdown("#### 🎓 硕博论文对比")
-    deg = analyzer.degree_analysis()
-    if deg["doctor"]["count"] > 0 and deg["master"]["count"] > 0:
-        d1, d2 = st.columns(2)
-        with d1:
-            st.caption(f"博士论文 ({deg['doctor']['count']}篇)")
-            dd = pd.DataFrame(deg["doctor"]["keywords"], columns=["关键词", "频次"])
-            fig = px.bar(dd.head(8), x="频次", y="关键词", orientation="h",
-                         color="频次", color_continuous_scale="Reds", title="博士高频词")
-            fig.update_layout(yaxis=dict(autorange="reversed"), height=280)
-            st.plotly_chart(fig, use_container_width=True)
-        with d2:
-            st.caption(f"硕士论文 ({deg['master']['count']}篇)")
-            md = pd.DataFrame(deg["master"]["keywords"], columns=["关键词", "频次"])
-            fig = px.bar(md.head(8), x="频次", y="关键词", orientation="h",
-                         color="频次", color_continuous_scale="Blues", title="硕士高频词")
-            fig.update_layout(yaxis=dict(autorange="reversed"), height=280)
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("未检测到硕博论文数据")
+    st.caption(f"硕士论文 ({deg['master']['count']}篇)")
+    md = pd.DataFrame(deg["master"]["keywords"], columns=["关键词", "频次"])
+    fig = px.bar(md.head(8), x="频次", y="关键词", orientation="h",
+                 color="频次", color_continuous_scale="Blues", title="硕士高频词")
+    fig.update_layout(yaxis=dict(autorange="reversed"), height=350)
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("未检测到硕博论文数据")
 
-with dd2:
-    st.markdown("#### 💰 基金资助 & 高频词")
-    fund_rank = analyzer.fund_ranking(top_n=10)
-    if fund_rank:
-        fdf = pd.DataFrame([{"基金": f["fund"][:40], "次数": f["count"]} for f in fund_rank])
-        fig = px.bar(fdf, x="次数", y="基金", orientation="h", color="次数",
-                     color_continuous_scale="Purples", title="基金资助排名")
-        fig.update_layout(yaxis=dict(autorange="reversed"), height=280)
+st.markdown("---")
+st.markdown("#### 💰 基金资助排名")
+fund_rank = analyzer.fund_ranking(top_n=10)
+if fund_rank:
+    fdf = pd.DataFrame([{"基金": f["fund"][:40], "次数": f["count"]} for f in fund_rank])
+    fig = px.bar(fdf, x="次数", y="基金", orientation="h", color="次数",
+                 color_continuous_scale="Purples", title="基金资助排名")
+    fig.update_layout(yaxis=dict(autorange="reversed"), height=350)
+    st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("#### 🔥 Top 15 高频关键词")
+try:
+    session = get_session()
+    hotspot = HotspotAnalyzer()
+    result = hotspot.analyze(session, top_n=15)
+    session.close()
+    if result.data.get("top_keywords_overall"):
+        top_kws = result.data["top_keywords_overall"][:15]
+        kw_df = pd.DataFrame(top_kws, columns=["关键词", "频次"])
+        fig = px.bar(kw_df, x="频次", y="关键词", orientation="h",
+                     title="Top 15 高频关键词", color="频次", color_continuous_scale="Blues")
+        fig.update_layout(yaxis=dict(autorange="reversed"), height=400)
         st.plotly_chart(fig, use_container_width=True)
-
-    try:
-        session = get_session()
-        hotspot = HotspotAnalyzer()
-        result = hotspot.analyze(session, top_n=15)
-        session.close()
-        if result.data.get("top_keywords_overall"):
-            top_kws = result.data["top_keywords_overall"][:15]
-            kw_df = pd.DataFrame(top_kws, columns=["关键词", "频次"])
-            fig = px.bar(kw_df, x="频次", y="关键词", orientation="h",
-                         title="Top 15 高频关键词", color="频次", color_continuous_scale="Blues")
-            fig.update_layout(yaxis=dict(autorange="reversed"), height=320)
-            st.plotly_chart(fig, use_container_width=True)
-    except Exception as e:
-        st.warning(f"热点分析失败: {e}")
+except Exception as e:
+    st.warning(f"热点分析失败: {e}")
 
 # ═══════════════════ 6. 文献管理 ═══════════════════
 st.markdown("---")
@@ -612,7 +590,7 @@ with ec2:
         st.download_button("📥 导出 CSV", data=csv, file_name="文献导出.csv",
                            mime="text/csv", use_container_width=True)
 with ec3:
-    st.caption(f"v6.1 | {total}篇 | 深度分析版")
+    st.caption(f"v6.2 | {total}篇 | 单图全宽布局")
 
 st.markdown("---")
 st.caption("文献分析系统 — 上传知网导出文件 → 自动解析 → 全方位可视化分析")
