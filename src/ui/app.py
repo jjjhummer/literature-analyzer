@@ -1,4 +1,4 @@
-"""文献分析系统 - 单页滚动版"""
+"""文献分析系统 - 单页滚动版 (v6.0 深度分析增强)"""
 
 import sys, io, base64, os, asyncio, importlib
 from pathlib import Path
@@ -53,6 +53,7 @@ st.markdown("""<style>
 .metric .n{font-size:2em;font-weight:bold;color:#1a73e8;}
 .metric .l{font-size:0.75em;color:#666;}
 .section-title{font-size:1.3em;font-weight:bold;margin-top:20px;padding:10px 0;border-bottom:2px solid #1a73e8;}
+.sidebar-note{font-size:0.8em;color:#888;margin-top:10px;}
 </style>""", unsafe_allow_html=True)
 
 # ── Session State ──
@@ -187,6 +188,38 @@ except Exception as e:
     st.error(f"初始化分析失败: {e}")
     st.stop()
 
+# ═══════════════════ 侧边栏：参数控制 ═══════════════════
+with st.sidebar:
+    st.markdown("## ⚙️ 分析参数")
+    st.markdown('<p class="sidebar-note">调整以下参数后图表会实时更新</p>', unsafe_allow_html=True)
+    st.markdown("---")
+
+    st.markdown("### 📊 通用设置")
+    top_n_authors = st.slider("作者排名数量", 5, 50, 15, 5, key="s_author_n")
+    top_n_insts = st.slider("机构排名数量", 5, 50, 15, 5, key="s_inst_n")
+    top_n_keywords = st.slider("关键词展示数量", 10, 100, 30, 10, key="s_kw_n")
+
+    st.markdown("---")
+    st.markdown("### ☁ 词云设置")
+    wc_max_words = st.slider("词云最大词数", 50, 500, 150, 50, key="s_wc_words")
+    wc_bg = st.selectbox("词云背景色", ["white", "black", "#f5f7fa"], key="s_wc_bg")
+
+    st.markdown("---")
+    st.markdown("### 🧠 深度分析")
+    cluster_n = st.slider("聚类数量", 2, 10, 5, 1, key="s_cluster_n")
+    lda_n = st.slider("LDA主题数", 2, 10, 5, 1, key="s_lda_n")
+
+    st.markdown("---")
+    st.markdown("### 🔗 网络图设置")
+    coauthor_min = st.slider("合作网络-最少合作次数", 1, 10, 1, 1, key="s_coauthor_min")
+    collab_min = st.slider("机构合作-最少合作次数", 1, 10, 1, 1, key="s_collab_min")
+    network_max_edges = st.slider("网络图最大边数", 20, 200, 60, 20, key="s_net_edges")
+
+    st.markdown("---")
+    st.caption(f"📦 数据库共 {total} 篇文献")
+
+# ═══════════════════ 主内容 ═══════════════════
+
 stats = analyzer.summary_stats()
 gr = analyzer.yearly_growth()
 
@@ -234,19 +267,32 @@ with c2:
         fig.update_layout(height=380)
         st.plotly_chart(fig, use_container_width=True)
 
-# 时间段对比
-period = analyzer.period_comparison()
-if period and period.get("rising"):
-    st.markdown("#### 📊 时间段对比")
-    pc1, pc2 = st.columns(2)
-    with pc1:
-        st.markdown(f"**📈 上升趋势 ({period['late_label']})**")
-        for c in period["rising"][:8]:
-            st.markdown(f"- {c['keyword']}: {c['early_rate']:.1f}% → {c['late_rate']:.1f}% (+{c['change']:.1f})")
-    with pc2:
-        st.markdown(f"**📉 下降趋势 ({period['late_label']})**")
-        for c in period["declining"][:8]:
-            st.markdown(f"- {c['keyword']}: {c['early_rate']:.1f}% → {c['late_rate']:.1f}% ({c['change']:.1f})")
+# 时间段对比 + 机构年度趋势
+tab1, tab2 = st.tabs(["📊 时间段对比", "🏛 机构年度趋势"])
+with tab1:
+    period = analyzer.period_comparison()
+    if period and period.get("rising"):
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            st.markdown(f"**📈 上升趋势 ({period['late_label']})**")
+            for c in period["rising"][:8]:
+                st.markdown(f"- {c['keyword']}: {c['early_rate']:.1f}% → {c['late_rate']:.1f}% (+{c['change']:.1f})")
+        with pc2:
+            st.markdown(f"**📉 下降趋势 ({period['late_label']})**")
+            for c in period["declining"][:8]:
+                st.markdown(f"- {c['keyword']}: {c['early_rate']:.1f}% → {c['late_rate']:.1f}% ({c['change']:.1f})")
+
+with tab2:
+    inst_yearly = analyzer.institution_yearly(top_n=6)
+    if inst_yearly:
+        fig = go.Figure()
+        for inst_name, data in inst_yearly.items():
+            years = sorted(data.keys())
+            counts = [data[y] for y in years]
+            fig.add_trace(go.Scatter(x=years, y=counts, mode="lines+markers", name=inst_name[:20]))
+        fig.update_layout(title="主要机构年度发文趋势", height=400,
+                          xaxis_title="年份", yaxis_title="发文量")
+        st.plotly_chart(fig, use_container_width=True)
 
 # 突现关键词
 burst = analyzer.keyword_burst(top_n=10)
@@ -261,10 +307,9 @@ if burst.get("bursts"):
 st.markdown("---")
 st.markdown('<div class="section-title">🔗 关键词分析</div>', unsafe_allow_html=True)
 
-# 相关性热力图 + 树图
 kr1, kr2 = st.columns([3, 2])
 with kr1:
-    corr = analyzer.keyword_correlation(top_n=15)
+    corr = analyzer.keyword_correlation(top_n=min(top_n_keywords, 30))
     if corr.get("matrix"):
         cdf = pd.DataFrame(corr["matrix"], index=corr["keywords"], columns=corr["keywords"])
         fig = px.imshow(cdf, aspect="auto", color_continuous_scale="RdBu_r",
@@ -273,7 +318,7 @@ with kr1:
         st.plotly_chart(fig, use_container_width=True)
 
 with kr2:
-    treemap = analyzer.keyword_treemap(top_n=30)
+    treemap = analyzer.keyword_treemap(top_n=top_n_keywords)
     if treemap:
         tdf = pd.DataFrame(treemap)
         fig = px.treemap(tdf, path=["keyword"], values="count",
@@ -287,7 +332,7 @@ with wc1:
     try:
         session = get_session()
         kw_analyzer = KeywordCloudAnalyzer()
-        result = kw_analyzer.analyze(session, max_words=150)
+        result = kw_analyzer.analyze(session, max_words=wc_max_words, background_color=wc_bg)
         session.close()
         if result.data.get("image_base64"):
             st.markdown(f'<img src="data:image/png;base64,{result.data["image_base64"]}" '
@@ -313,7 +358,7 @@ st.markdown('<div class="section-title">👤 作者分析</div>', unsafe_allow_h
 
 ar1, ar2 = st.columns(2)
 with ar1:
-    author_rank = analyzer.author_ranking(top_n=15)
+    author_rank = analyzer.author_ranking(top_n=top_n_authors)
     if author_rank:
         adf = pd.DataFrame([{"作者": a["name"], "发文量": a["count"]} for a in author_rank])
         fig = px.bar(adf, x="发文量", y="作者", orientation="h", color="发文量",
@@ -329,14 +374,14 @@ with ar2:
         fig.update_layout(height=380)
         st.plotly_chart(fig, use_container_width=True)
 
-# 作者合作网络 - 独占一行，全宽展示
-coauthor = analyzer.author_co_occurrence(min_papers=1)
+# 作者合作网络 - 独占一行
+coauthor = analyzer.author_co_occurrence(min_papers=coauthor_min)
 if coauthor["edges"]:
     st.markdown("#### 🤝 作者合作网络")
     G = nx.Graph()
     for n in coauthor["nodes"]:
         G.add_node(n["id"])
-    for e in coauthor["edges"][:60]:
+    for e in coauthor["edges"][:network_max_edges]:
         G.add_edge(e["source"], e["target"], weight=e["weight"])
     pos = nx.spring_layout(G, k=1.5, iterations=50, seed=42)
     edge_x, edge_y = [], []
@@ -353,7 +398,7 @@ if coauthor["edges"]:
         textposition="top center", textfont=dict(size=10),
         marker=dict(size=[max(8, deg.get(n, 1) * 4) for n in G.nodes()],
                     color=list(deg.values()), colorscale="Viridis",
-                    showscale=True, colorbar=dict(title="度")),
+                    showscale=True, colorbar=dict(title="合作次数")),
     ))
     fig.update_layout(title="作者合作网络", height=700, showlegend=False,
                       xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -366,7 +411,7 @@ st.markdown('<div class="section-title">🏛 机构分析</div>', unsafe_allow_h
 
 ir1, ir2 = st.columns(2)
 with ir1:
-    inst_rank = analyzer.institution_ranking(top_n=15)
+    inst_rank = analyzer.institution_ranking(top_n=top_n_insts)
     if inst_rank:
         idf = pd.DataFrame([{"机构": r["name"], "发文量": r["count"]} for r in inst_rank])
         fig = px.bar(idf, x="发文量", y="机构", orientation="h", color="发文量",
@@ -389,13 +434,13 @@ with ir2:
         st.plotly_chart(fig, use_container_width=True)
 
 # 机构合作网络
-icollab = analyzer.institution_collaboration()
+icollab = analyzer.institution_collaboration(min_weight=collab_min)
 if icollab["edges"]:
-    st.markdown("#### 机构合作网络")
+    st.markdown("#### 🌐 机构合作网络")
     G2 = nx.Graph()
     for n in icollab["nodes"]:
         G2.add_node(n["id"])
-    for e in icollab["edges"][:40]:
+    for e in icollab["edges"][:network_max_edges]:
         G2.add_edge(e["source"], e["target"], weight=e["weight"])
     pos2 = nx.spring_layout(G2, k=1.5, iterations=50, seed=42)
     ex, ey = [], []
@@ -411,7 +456,7 @@ if icollab["edges"]:
         textposition="top center", textfont=dict(size=10),
         marker=dict(size=12, color="steelblue"),
     ))
-    fig.update_layout(title="机构合作网络", height=400, showlegend=False,
+    fig.update_layout(title="机构合作网络", height=450, showlegend=False,
                       xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                       yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
     st.plotly_chart(fig, use_container_width=True)
@@ -425,7 +470,7 @@ st.markdown("#### 📌 文献聚类")
 cl1, cl2 = st.columns([3, 2])
 with cl1:
     with st.spinner("正在进行文献聚类..."):
-        clustering = analyzer.abstract_clustering(n_clusters=5)
+        clustering = analyzer.abstract_clustering(n_clusters=cluster_n)
     if "error" not in clustering:
         pdf = pd.DataFrame(clustering["points"])
         fig = px.scatter(pdf, x="x", y="y", color=pdf["cluster"].astype(str),
@@ -434,6 +479,9 @@ with cl1:
                          color_discrete_sequence=px.colors.qualitative.Set2)
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info(clustering.get("error", "聚类数据不足"))
+
 with cl2:
     if "error" not in clustering:
         for cl in clustering["clusters"]:
@@ -444,7 +492,7 @@ with cl2:
 # LDA
 st.markdown("#### 🧩 LDA主题建模")
 with st.spinner("正在进行LDA主题建模..."):
-    lda = analyzer.lda_topics(n_topics=5)
+    lda = analyzer.lda_topics(n_topics=lda_n)
 if "error" not in lda and lda.get("topics"):
     lcols = st.columns(len(lda["topics"]))
     for i, t in enumerate(lda["topics"]):
@@ -453,7 +501,7 @@ if "error" not in lda and lda.get("topics"):
             st.markdown(f"""<div class="card" style="text-align:center;">
             <b>主题 {t['id']+1}</b><br><small>{terms}</small></div>""", unsafe_allow_html=True)
 else:
-    st.info("LDA 需要更多摘要数据")
+    st.info("LDA 需要更多摘要数据（≥20篇有摘要的文献）")
 
 # 硕博对比 + 基金
 st.markdown("---")
@@ -491,7 +539,6 @@ with dd2:
         fig.update_layout(yaxis=dict(autorange="reversed"), height=280)
         st.plotly_chart(fig, use_container_width=True)
 
-    # 高频词
     try:
         session = get_session()
         hotspot = HotspotAnalyzer()
@@ -568,8 +615,7 @@ with ec2:
         st.download_button("📥 导出 CSV", data=csv, file_name="文献导出.csv",
                            mime="text/csv", use_container_width=True)
 with ec3:
-    st.caption(f"v5.1 | {total}篇 | 滚动版")
+    st.caption(f"v6.0 | {total}篇 | 深度分析版")
 
-# ── Footer ──
 st.markdown("---")
 st.caption("文献分析系统 — 上传知网导出文件 → 自动解析 → 全方位可视化分析")
