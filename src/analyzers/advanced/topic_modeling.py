@@ -7,8 +7,13 @@ from typing import Optional
 
 import numpy as np
 from sqlalchemy.orm import Session
-from gensim import corpora, models
-from gensim.models.coherencemodel import CoherenceModel
+
+try:
+    from gensim import corpora, models
+    from gensim.models.coherencemodel import CoherenceModel
+    _HAS_GENSIM = True
+except ImportError:
+    _HAS_GENSIM = False
 
 from src.analyzers.base import AbstractAnalyzer, AnalysisResult
 from src.analyzers.advanced.text_processor import preprocess_text, load_stopwords
@@ -52,6 +57,15 @@ class TopicModelingAnalyzer(AbstractAnalyzer):
             主题建模结果，包含主题-词分布和文档-主题分布
         """
         settings = get_settings()
+
+        if not _HAS_GENSIM:
+            return AnalysisResult(
+                analysis_type=self.name,
+                title="LDA 主题建模",
+                data={},
+                description="gensim 未安装",
+                warnings=["gensim 未安装，无法进行LDA主题建模。请运行: pip install gensim"],
+            )
 
         # 1. 获取论文摘要
         from sqlalchemy import select, and_
